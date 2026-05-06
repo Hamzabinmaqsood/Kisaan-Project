@@ -1,0 +1,30 @@
+# Django and REST Framework
+Django
+djangorestframework
+django-cors-headers
+
+# Translation and Voice
+deep-translator
+edge-tts==7.2.7
+
+# Image Processing
+Pillow
+numpy
+
+# HTTP Requests
+requests
+django-filter
+django-import-export
+djangorestframework-simplejwt
+
+sentinelhub
+opencv-python
+webdriver-manager
+reportlab>=4.0.0
+python-dateutil>=2.8.0
+rasterio
+matplotlib
+folium
+selenium
+arabic-reshaper
+python-bidi

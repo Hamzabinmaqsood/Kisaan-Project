@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Field Mapper — Kisan Ki Pechan</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+
+  <style>
+    :root {
+      --glass-bg: rgba(12, 20, 14, 0.72);
+      --glass-border: rgba(255, 255, 255, 0.10);
+      --glass-blur: blur(18px);
+      --accent: #4ade80;
+      --accent-dim: rgba(74, 222, 128, 0.18);
+      --text: #e8f5ec;
+      --muted: rgba(232, 245, 236, 0.50);
+      --danger: #f87171;
+      --panel-w: 300px;
+      --radius: 14px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { height: 100%; font-family: 'Syne', sans-serif; overflow: hidden; }
+
+    /* ── MAP ── */
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+
+    /* Hide default leaflet attribution clutter */
+    .leaflet-control-attribution { display: none !important; }
+
+    /* ── GLASS PANEL (left sidebar) ── */
+    #panel {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: var(--panel-w);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .glass {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border-radius: var(--radius);
+      color: var(--text);
+    }
+
+    /* ── HEADER card ── */
+    .card-header {
+      padding: 16px 18px;
+    }
+    .card-header .brand {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .card-header h1 {
+      font-size: 18px;
+      font-weight: 800;
+      line-height: 1.2;
+      color: var(--text);
+    }
+
+    /* ── SEARCH card ── */
+    .card-search {
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-search .ico { color: var(--accent); font-size: 14px; flex-shrink: 0; }
+    .card-search input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--text);
+    }
+    .card-search input::placeholder { color: var(--muted); }
+
+    /* ── NAV GOTO card ── */
+    .card-goto {
+      padding: 12px 14px;
+      width: 150%;
+    }
+    .card-goto label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+      display: block;
+    }
+    .goto-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .goto-row input {
+      flex: 1;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      padding: 6px 9px;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .goto-row input:focus { border-color: var(--accent); }
+    .goto-row input::placeholder { color: var(--muted); }
+    .btn-go {
+      background: var(--accent);
+      color: #0a1a0d;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .btn-go:hover { opacity: 0.85; transform: translateY(-1px); }
+
+    /* ── STATS card ── */
+    .card-stats {
+      padding: 14px 16px;
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+    .stat-row:last-child { margin-bottom: 0; }
+    .stat-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .stat-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent);
+    }
+    .stat-value.empty { color: var(--muted); }
+
+    /* ── COORDINATES LIST card ── */
+    .card-coords {
+      padding: 14px 16px;
+      max-height: 200px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .card-coords .coords-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+      flex-shrink: 0;
+    }
+    .coords-scroll {
+      overflow-y: auto;
+      flex: 1;
+    }
+    .coords-scroll::-webkit-scrollbar { width: 3px; }
+    .coords-scroll::-webkit-scrollbar-track { background: transparent; }
+    .coords-scroll::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+    .coord-item {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--text);
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      display: flex;
+      gap: 6px;
+    }
+    .coord-item .idx { color: var(--accent); min-width: 18px; }
+    .coord-empty {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    /* ── ACTION BUTTONS card ── */
+    .card-actions {
+      padding: 12px 14px;
+      display: flex;
+      gap: 8px;
+    }
+    .btn-action {
+      flex: 1;
+      padding: 9px 0;
+      border: none;
+      border-radius: 9px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .btn-action:hover { opacity: 0.85; transform: translateY(-1px); }
+    .btn-confirm {
+      background: var(--accent);
+      color: #0a1a0d;
+    }
+    .btn-clear {
+      background: rgba(248, 113, 113, 0.15);
+      color: var(--danger);
+      border: 1px solid rgba(248, 113, 113, 0.30);
+    }
+
+    /* ── LEAFLET DRAW TOOLBAR overrides ── */
+    .leaflet-draw-toolbar a {
+      background-color: rgba(92, 143, 104, 0.8) !important;
+      border-color: rgba(255,255,255,0.12) !important;
+      color: var(--accent) !important;
+      backdrop-filter: blur(10px);
+    }
+    .leaflet-draw-toolbar a:hover { background-color: rgba(74,222,128,0.15) !important; }
+    .leaflet-bar { border: 1px solid rgba(255,255,255,0.12) !important; border-radius: 10px !important; overflow: hidden; }
+
+    /* Leaflet zoom buttons */
+    .leaflet-control-zoom a {
+      background: rgba(12, 20, 14, 0.80) !important;
+      color: var(--accent) !important;
+      border-color: rgba(255,255,255,0.10) !important;
+      backdrop-filter: blur(10px);
+    }
+    .leaflet-control-zoom a:hover { background: rgba(74,222,128,0.15) !important; }
+
+    /* Geocoder */
+    .leaflet-control-geocoder {
+      background: rgba(12, 20, 14, 0.82) !important;
+      border: 1px solid rgba(255,255,255,0.10) !important;
+      border-radius: 10px !important;
+      backdrop-filter: blur(14px) !important;
+    }
+    .leaflet-control-geocoder input {
+      background: transparent !important;
+      color: #e8f5ec !important;
+      font-family: 'DM Mono', monospace !important;
+    }
+    /* Geocoder results dropdown */
+    .leaflet-control-geocoder-alternatives {
+      background: rgba(12, 20, 14, 0.95) !important;
+      border: 1px solid rgba(255,255,255,0.10) !important;
+      border-radius: 0 0 10px 10px !important;
+      backdrop-filter: blur(18px) !important;
+    }
+    .leaflet-control-geocoder-alternatives li a,
+    .leaflet-control-geocoder-alternatives li span {
+      color: #e8f5ec !important;
+      font-family: 'DM Mono', monospace !important;
+      font-size: 12px !important;
+    }
+    .leaflet-control-geocoder-alternatives li:hover a,
+    .leaflet-control-geocoder-alternatives li:hover span {
+      background: rgba(74, 222, 128, 0.15) !important;
+      color: #4ade80 !important;
+    }
+    /* Draw toolbar spacing below geocoder */
+    .leaflet-top.leaflet-right .leaflet-draw {
+      margin-top: 8px;
+    }
+
+    /* ── TOAST notification ── */
+    #toast {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(12,20,14,0.90);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      padding: 10px 20px;
+      border-radius: 30px;
+      z-index: 2000;
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      backdrop-filter: blur(14px);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- ── GLASS PANEL ── -->
+<div id="panel">
+
+  <!-- Header -->
+  <div class="glass card-header">
+    <div class="brand">Kisan Ki Pechan</div>
+    <h1>Field Mapper</h1>
+  </div>
+
+  <!-- Go to Lat/Lng -->
+  <div class="glass card-goto">
+    <label>Navigate to Coordinates</label>
+    <div class="goto-row">
+      <input type="number" step="any" id="lat-input" placeholder="Latitude" />
+      <input type="number" step="any" id="lng-input" placeholder="Longitude" />
+      <button class="btn-go" onclick="goToLatLng()">GO</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="glass card-stats">
+    <div class="stat-row">
+      <span class="stat-label">Vertices</span>
+      <span class="stat-value empty" id="stat-points">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Area</span>
+      <span class="stat-value empty" id="stat-area">—</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Polygons</span>
+      <span class="stat-value empty" id="stat-polys">0</span>
+    </div>
+  </div>
+
+  <!-- Coordinate list -->
+  <div class="glass card-coords">
+    <div class="coords-label">Polygon Coordinates</div>
+    <div class="coords-scroll" id="coords-list">
+      <div class="coord-empty">Draw a polygon on the map…</div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="glass card-actions">
+    <button class="btn-action btn-confirm" onclick="confirmAndSend()">✓ Confirm & Save</button>
+    <button class="btn-action btn-clear" onclick="clearAll()">✕ Clear</button>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-geometryutil@0.12.0/dist/leaflet.geometryutil.min.js"></script>
+
+<script>
+  // ── MAP INIT ──
+  var map = L.map('map', { zoomControl: false }).setView([30.33084, 71.24750], 7);
+
+  L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+    maxZoom: 20,
+    subdomains: ['mt0','mt1','mt2','mt3']
+  }).addTo(map);
+
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  L.Control.geocoder({ position: 'topright' }).addTo(map);
+
+  // ── DRAW ──
+  var drawnItems = new L.FeatureGroup().addTo(map);
+
+  var drawControl = new L.Control.Draw({
+    position: 'topright',
+    edit: { featureGroup: drawnItems },
+    draw: {
+      polygon: {
+        shapeOptions: { color: '#4ade80', fillColor: '#4ade80', fillOpacity: 0.15, weight: 2 }
+      },
+      polyline: false, rectangle: false, circle: false, marker: false, circlemarker: false
+    }
+  });
+  map.addControl(drawControl);
+
+  var lastLatLngs = [];
+
+  // ── ON DRAW ──
+  map.on('draw:created', function (e) {
+    drawnItems.addLayer(e.layer);
+    updateUI(e.layer);
+  });
+
+  map.on('draw:edited', function () {
+    var layers = drawnItems.getLayers();
+    if (layers.length) updateUI(layers[layers.length - 1]);
+  });
+
+  map.on('draw:deleted', function () {
+    if (drawnItems.getLayers().length === 0) resetUI();
+    else {
+      var layers = drawnItems.getLayers();
+      updateUI(layers[layers.length - 1]);
+    }
+  });
+
+  function updateUI(layer) {
+    var latlngs = layer.getLatLngs()[0];
+    lastLatLngs = latlngs;
+
+    // Stats
+    var aream2 = L.GeometryUtil.geodesicArea(latlngs);
+    var acres  = (aream2 / 4046.86).toFixed(3);
+    var polyCount = drawnItems.getLayers().length;
+
+    setText('stat-points', latlngs.length, false);
+    setText('stat-area',   acres + ' ac', false);
+    setText('stat-polys',  polyCount, false);
+
+    // Coordinate list
+    var list = document.getElementById('coords-list');
+    list.innerHTML = latlngs.map(function(ll, i) {
+      return '<div class="coord-item">' +
+        '<span class="idx">' + (i+1) + '</span>' +
+        '<span>' + ll.lat.toFixed(6) + ', ' + ll.lng.toFixed(6) + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  function resetUI() {
+    lastLatLngs = [];
+    setText('stat-points', '—', true);
+    setText('stat-area',   '—', true);
+    setText('stat-polys',  '0', true);
+    document.getElementById('coords-list').innerHTML = '<div class="coord-empty">Draw a polygon on the map…</div>';
+  }
+
+  function setText(id, val, empty) {
+    var el = document.getElementById(id);
+    el.textContent = val;
+    el.className = 'stat-value' + (empty ? ' empty' : '');
+  }
+
+  // ── GOTO ──
+  var latLngMarker = null;
+  function goToLatLng() {
+    var lat = parseFloat(document.getElementById('lat-input').value);
+    var lng = parseFloat(document.getElementById('lng-input').value);
+    if (isNaN(lat) || isNaN(lng)) { showToast('⚠ Enter valid coordinates'); return; }
+    if (latLngMarker) map.removeLayer(latLngMarker);
+    latLngMarker = L.circleMarker([lat, lng], {
+      radius: 7, color: '#4ade80', fillColor: '#4ade80', fillOpacity: 0.6, weight: 2
+    }).addTo(map);
+    map.setView([lat, lng], 16);
+    showToast('📍 Navigated to ' + lat.toFixed(5) + ', ' + lng.toFixed(5));
+  }
+
+  // ── CONFIRM & SEND ──
+  function confirmAndSend() {
+    var layers = drawnItems.getLayers();
+    if (layers.length === 0) { showToast('⚠ No polygon drawn yet'); return; }
+
+    // Collect all polygons as arrays of {lat, lng}
+    var allPolygons = layers.map(function(layer) {
+      return layer.getLatLngs()[0].map(function(ll) {
+        return { lat: ll.lat, lng: ll.lng };
+      });
+    });
+
+    var payload = {
+      polygons: allPolygons,
+      // flat list for single-polygon convenience
+      coordinates: allPolygons[0]
+    };
+
+    localStorage.setItem('form_data', JSON.stringify(payload));
+    showToast('✓ Coordinates saved! Closing…');
+    setTimeout(function() { window.close(); }, 1400);
+  }
+
+  // ── CLEAR ──
+  function clearAll() {
+    drawnItems.clearLayers();
+    resetUI();
+    showToast('✕ All polygons cleared');
+  }
+
+  // ── TOAST ──
+  function showToast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(function() { t.classList.remove('show'); }, 2600);
+  }
+</script>
+</body>
+</html>

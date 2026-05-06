@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Databases
+*.sqlite3
+
+# Environment secrets
+.env
+
+# Local settings (Important!)
+local_settings.py
+
+# Media/Static
+media/
+static/
