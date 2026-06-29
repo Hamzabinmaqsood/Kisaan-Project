@@ -4,11 +4,14 @@ from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.models import Group, Permission
 from CropsRecomendations.models import CropSeason,CropType
 from LinkedValues.models import Districts
+import os
+from datetime import datetime
+
 class MyUserManager(BaseUserManager):
     def create_user(self, mobile_number, password=None, **extra_fields):
         if not mobile_number:
             raise ValueError(_('The mobile_number field must be set'))
-        
+
         user = self.model(
             mobile_number=mobile_number,
             **extra_fields
@@ -39,13 +42,21 @@ class Role(models.Model):
 
     def __str__(self):
         return self.name
-    
+
+def profile_picture_upload_path(instance, filename):
+    ext = os.path.splitext(filename)[1]  # .jpg, .png, etc.
+
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    user_id = instance.pk or "temp"
+
+    return f"profile_pictures/user_{instance.id}_{timestamp}{ext}"
+
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     STATUS_CHOICES = [
         (True, _('Active')),
         (False, _('Inactive')),
-    ] 
+    ]
     STAFF_CHOICES = [
         (True, _('Yes')),
         (False, _('No')),
@@ -53,6 +64,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     user_creator = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='created_users',)
     role = models.ForeignKey(Role, on_delete=models.CASCADE,)
     username = models.CharField(max_length=150, null=True, blank=True)  # increase from 30 → 150
+    profile_picture = models.ImageField(
+    upload_to=profile_picture_upload_path,
+    null=True,
+    blank=True
+)
+
     section_name = models.CharField(max_length=50,null=True, blank=True)
     mobile_number = models.CharField(max_length=11, null=True, blank=True,unique=True)
     cnic = models.CharField(max_length=13, null=True, blank=True )
@@ -99,8 +116,8 @@ class Farms(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     def __str__(self):
         return f'{self.farm_name}'
-    
-    
+
+
 class UserFollwers(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='user_follwers')
     follower = models.ManyToManyField(CustomUser,  related_name='followers')

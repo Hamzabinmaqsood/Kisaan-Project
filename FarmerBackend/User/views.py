@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
-from rest_framework.authtoken.models import Token 
+from rest_framework.authtoken.models import Token
 from django.shortcuts import get_object_or_404
 from collections import Counter
 import json
@@ -29,6 +29,8 @@ from sentinelhub import BBox, CRS
 
 from .models import Farms
 from .sentinel import get_sentinel_image
+
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 
 class FarmSatelliteView(APIView):
@@ -72,7 +74,7 @@ class FarmSatelliteView(APIView):
 
             print(f"DEBUG bbox_coords: {bbox_coords}")
 
-            
+
             # -----------------------------------------
             # 3. Fetch satellite image
             # -----------------------------------------
@@ -105,7 +107,7 @@ class FarmSatelliteView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=500)
-        
+
 
 class UpdateSectionNameAPI(APIView):
 
@@ -133,7 +135,7 @@ class UpdateSectionNameAPI(APIView):
                 }, status=status.HTTP_404_NOT_FOUND)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 # Followers APIs
 class UserFollwersListCreateView(generics.ListCreateAPIView):
     queryset = UserFollwers.objects.all()
@@ -165,11 +167,16 @@ class UserFollowingRetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIVie
     permission_classes = [permissions.IsAuthenticated]
 
 
-class UserProfileView(generics.RetrieveAPIView):
+class UserProfileView(generics.RetrieveUpdateAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = UserProfileSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    lookup_field = 'id'  
+    permission_classes = [permissions.IsAuthenticated] 
+    lookup_field = 'id'
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_queryset(self):
+        return CustomUser.objects.filter(id=self.request.user.id)
+
 
 class LoginAPIView(APIView):
     """
@@ -196,7 +203,7 @@ class LoginAPIView(APIView):
                 "role": user.role.name
             }
         }, status=status.HTTP_200_OK)
-    
+
 
 # LIST + CREATE
 class FarmsListCreateView(generics.ListCreateAPIView):
@@ -221,7 +228,7 @@ class FarmsDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         # security: user can access only own farms
         return Farms.objects.filter(created_by=self.request.user)
-    
+
 
 class FarmerListAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -230,7 +237,7 @@ class FarmerListAPIView(APIView):
         farmers = CustomUser.objects.filter(role__name="Farmer")
         serializer = FarmerListSerializer(farmers, many=True)
         return Response(serializer.data)
-    
+
 class UserFarmsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -240,7 +247,7 @@ class UserFarmsAPIView(APIView):
 
         serializer = FarmSerializer(farms, many=True)
         return Response(serializer.data)
-    
+
 
 
 class SignupAPIView(APIView):
@@ -260,7 +267,7 @@ class SignupAPIView(APIView):
         return Response({
             "errors": serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
 
 
 # ---------------- ADD CROP ----------------
@@ -306,7 +313,7 @@ class UpsertCropAPIView(APIView):
             }, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 
 # ---------------- GET CROPS ----------------
 
@@ -334,7 +341,7 @@ class GetUserFirstCropAPIView(APIView):
             "user": crop.user.id,
             "crop_name": crop_list
         })
-    
+
 class MostCommonCropsAPIView(APIView):
 
     def get(self, request):

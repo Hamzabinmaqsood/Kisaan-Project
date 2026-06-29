@@ -35,7 +35,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     followers_count = serializers.SerializerMethodField()
     following_count = serializers.SerializerMethodField()
     role = serializers.CharField(source='role.name', read_only=True)
-
+    # profile_picture_url = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
@@ -45,17 +45,33 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'email',
             'cnic',
             'mobile_number',
+            'profile_picture',
+            'role',
+            'followers_count',
+            'following_count',
+        ]
+        read_only_fields = [
+            'id',
+            'mobile_number',
             'role',
             'followers_count',
             'following_count',
         ]
 
+    # def get_profile_picture_url(self, obj):
+    #     request = self.context.get("request")
+    #     if obj.profile_picture:
+    #         if request:
+    #             return request.build_absolute_uri(obj.profile_picture.url)
+    #         return obj.profile_picture.url
+    #     return None
+
     def get_followers_count(self, obj):
         return UserFollwers.objects.filter(follower=obj).count()
 
     def get_following_count(self, obj):
-        return UserFollwing.objects.filter(user=obj).first().following.count() \
-            if UserFollwing.objects.filter(user=obj).exists() else 0
+        following_obj = UserFollwing.objects.filter(user=obj).first()
+        return following_obj.following.count() if following_obj else 0
 
 class LoginSerializer(serializers.Serializer):
     cnic = serializers.CharField(max_length=13)
@@ -76,7 +92,7 @@ class LoginSerializer(serializers.Serializer):
 
         data['user'] = user
         return data
-    
+
 class FarmsSerializer(serializers.ModelSerializer):
 
     created_by = serializers.ReadOnlyField(source="created_by.id")
@@ -143,7 +159,7 @@ class SignupSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = ["id", "username",  "mobile_number", "password"]
 
-   
+
 
     # ? Validate Mobile (must be 11 digits)
     def validate_mobile_number(self, value):
